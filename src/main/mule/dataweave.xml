@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="f1e727af-caae-4124-8e86-8ed1161684bd" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<flow name="dataweave-functionsFlow" doc:id="4f92efc1-7df9-4db4-8aa7-24cce2430925" >
+		<http:listener doc:name="Listener" doc:id="5ba71704-3c88-4618-9ec0-35f45ebcde60" config-ref="HTTP_Listener_config" path="dataweave"/>
+		<file:read doc:name="Web log csv data" doc:id="9f25dea2-909c-4595-876b-3ace7a719220" path="C:\Users\Deblil\MuleSoft\DataWeave\input\access_log_NASA_sample.csv"/>
+		<ee:transform doc:name="Transform Message" doc:id="4b229528-3bdf-4c46-9380-4686f1f90a15" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<ee:transform doc:name="mapping" doc:id="3219cac9-22bc-42b0-82e1-1063447a17cd" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map (value, index) ->{
+	 "host": value.host,	
+	 "date_time":value.date_time as LocalDateTime {format:'d/MMM/y:HH:mm:ss'} default '',		
+	 "time_zone":value.time_zone,		
+	 "endpoint":	value.endpoint,	
+	 "status_code":value.status_code,
+	 "size_returned":value.size_returned as Number default 0,
+	 "year":value.date_time as LocalDateTime {format:'d/MMM/y:H:m:s'} as String{format:'y'} default '',
+	 "month":value.date_time as LocalDateTime {format:'d/MMM/y:HH:mm:ss'} as String{format:'M'} default '',
+	 "month_name":value.date_time as LocalDateTime {format:'d/MMM/y:H:m:s'} as String{format:'MMMM'} default '',
+	 "month_Abbreviated":value.date_time as LocalDateTime {format:'d/MMM/y:HH:mm:ss'} as String{format:'MMM'} default '',
+	 "dayOfYear":value.date_time as LocalDateTime {format:'d/MMM/y:HH:mm:ss'} as String{format:'D'} default '',
+	 "dayOfmonth":value.date_time as LocalDateTime {format:'d/MMM/y:HH:mm:ss'} as String{format:'d'} default '',
+	 "dayOfweek":value.date_time as LocalDateTime {format:'d/MMM/y:HH:mm:ss'} as String{format:'EEEE'} default '',
+	 "dayOfweek_Abbreviated":value.date_time as LocalDateTime {format:'d/MMM/y:HH:mm:ss'} as String{format:'E'} default '',
+	
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="size statistics" doc:id="31545db2-371a-4da7-9887-485ee0049d12" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	&#10;	'max size': max(payload..size_returned),&#10;	 'min size': min(payload..size_returned),&#10;	 'average size': round(avg(payload..size_returned))&#10;}]"/>
+		<scatter-gather doc:name="Filtering" doc:id="4df3dc2b-8bc9-4eb9-9a35-0fcf52aa6e19" >
+			<route >
+				<ee:transform doc:name='status_code == "302"' doc:id="1a289854-2c81-4044-a9af-7bd0987851ed">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/csv
+---
+payload filter (value, index) -> value.status_code == "302"
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+				<file:write doc:id="d3c0c75c-7047-44ee-b667-346024847d2b" doc:name="statuscode302.csv" path="C:\Users\Deblil\MuleSoft\DataWeave\output\statuscode302.csv"/>
+			</route>
+			<route >
+				<ee:transform doc:name='status_code startsWith("3")' doc:id="f88581a4-91df-43f8-bf57-8999e5950841" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv
+---
+payload filter (value, index) -> value.status_code startsWith("3")]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<file:write doc:id="c815c485-5056-4cfb-8000-7774489cb729" doc:name="statuscode3xx.csv" path="C:\Users\Deblil\MuleSoft\DataWeave\output\statuscode3xx.csv"/>
+			</route>
+			<route >
+				<ee:transform doc:name='endpoint endsWith(".gif")' doc:id="ff7a6000-1ce6-49e7-88e5-fd6f6ebebe24" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv
+---
+payload filter (value, index) -> value.endpoint endsWith(".gif")]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<file:write doc:id="d3f3e49b-faaf-4e6c-8db3-cdd5de69a75a" doc:name="gif_images.csv" path="C:\Users\Deblil\MuleSoft\DataWeave\output\gif_images.csv"/>
+			</route>
+			<route >
+				<ee:transform doc:name='value.endpoint contains("USA")' doc:id="e8588c7e-fba8-4270-baaf-bfa90a7d4315" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv
+---
+payload filter (value, index) -> value.endpoint contains("USA")]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<file:write doc:id="ccb9f4ce-efc6-4dc2-9723-9d11c74e1f36" doc:name="USA_endpoint" path="C:\Users\Deblil\MuleSoft\DataWeave\output\USA_endpoint.csv"/>
+			</route>
+		</scatter-gather>
+		<ee:transform doc:name="Status Message" doc:id="404ed750-bdbc-4b7b-b2f7-0b43629714a2" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": 'completed!'
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
